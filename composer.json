@@ -1,0 +1,28 @@
+{
+    "name": "dbravoan/dbcms-module-forms",
+    "type": "dbcms-module",
+    "description": "Dynamic custom form builder with runtime validation, honeypot anti-spam, and localized submission intake",
+    "license": "MIT",
+    "require": {
+        "dbravoan/dbcms-core": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "DbCms\\Modules\\Forms\\": "./"
+        }
+    },
+    "extra": {
+        "dbcms": {
+            "name": "Dynamic Form Builder",
+            "identifier": "forms",
+            "author": "dbCMS Core Team",
+            "description": "Dynamic custom form builder with runtime validation, honeypot anti-spam, and localized submission intake",
+            "provider": "DbCms\\Modules\\Forms\\FormsModuleServiceProvider",
+            "is_pageable": false,
+            "repository": "https://github.com/dbravoan/dbcms-module-forms",
+            "morphs": {
+                "form": "DbCms\\Modules\\Forms\\Models\\CustomForm"
+            }
+        }
+    }
+}
