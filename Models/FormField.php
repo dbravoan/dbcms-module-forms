@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DbCms\Modules\Forms\Models;
 
 use DbCms\Core\Models\Market;
+use DbCms\Core\Services\Content\PublicTranslation;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -68,15 +69,10 @@ class FormField extends Model
         $locale = $locale ?? app()->getLocale();
         $marketId = $marketId ?? $this->currentMarketId();
 
-        /** @var Collection<int, FormFieldTranslation> $translations */
-        $translations = $this->relationLoaded('translations')
-            ? $this->translations
-            : $this->translations()->get();
+        /** @var FormFieldTranslation|null $translation */
+        $translation = PublicTranslation::resolveForMarketId($this, $locale, $marketId);
 
-        return $translations->first(fn (FormFieldTranslation $t): bool => $t->locale === $locale && $t->market_id === $marketId)
-            ?? $translations->first(fn (FormFieldTranslation $t): bool => $t->locale === $locale && $t->market_id === null)
-            ?? $translations->firstWhere('locale', $locale)
-            ?? $translations->first();
+        return $translation;
     }
 
     /** @return Attribute<string, never> */

@@ -6,6 +6,7 @@ namespace DbCms\Modules\Forms\Models;
 
 use DbCms\Core\Content\Contracts\TranslatableEntity;
 use DbCms\Core\Models\Market;
+use DbCms\Core\Services\Content\PublicTranslation;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -81,22 +82,20 @@ class CustomForm extends Model implements TranslatableEntity
     }
 
     /**
-     * Resolve the best translation for a locale/market (exact market → generic → any locale).
+     * Resolve the translation for the requested locale/market.
+     *
+     * A regional row may inherit blanks from the global row of the same
+     * language. It never falls back to another language.
      */
     public function translation(?string $locale = null, ?int $marketId = null): ?CustomFormTranslation
     {
         $locale = $locale ?? app()->getLocale();
         $marketId = $marketId ?? self::currentMarketId();
 
-        /** @var Collection<int, CustomFormTranslation> $translations */
-        $translations = $this->relationLoaded('translations')
-            ? $this->translations
-            : $this->translations()->get();
+        /** @var CustomFormTranslation|null $translation */
+        $translation = PublicTranslation::resolveForMarketId($this, $locale, $marketId);
 
-        return $translations->first(fn (CustomFormTranslation $t): bool => $t->locale === $locale && $t->market_id === $marketId)
-            ?? $translations->first(fn (CustomFormTranslation $t): bool => $t->locale === $locale && $t->market_id === null)
-            ?? $translations->firstWhere('locale', $locale)
-            ?? $translations->first();
+        return $translation;
     }
 
     /** @return Attribute<string, never> */

@@ -7,9 +7,12 @@ namespace DbCms\Modules\Forms\Services;
 use DbCms\Core\Forms\FieldTypeRegistry;
 use DbCms\Core\Forms\SchemaFactory;
 use DbCms\Core\Models\Market;
+use DbCms\Core\Services\Content\PublicTranslation;
 use DbCms\Core\Services\Privacy\LegalPageService;
 use DbCms\Modules\Forms\Models\CustomForm;
 use DbCms\Modules\Forms\Models\FormSubmission;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -103,10 +106,22 @@ class FormDomainService
      */
     public function getFormBySlug(string $slug, ?Market $market = null): ?CustomForm
     {
+        return $this->publicQuery($market)->where('slug', $slug)->first();
+    }
+
+    /** @return Collection<int, CustomForm> */
+    public function getPublicForms(Market $market, string $locale): Collection
+    {
+        return $this->publicQuery($market)->orderBy('id')->get()
+            ->filter(static fn (CustomForm $form): bool => PublicTranslation::resolve($form, $locale, $market) !== null)->values();
+    }
+
+    /** @return Builder<CustomForm> */
+    private function publicQuery(?Market $market): Builder
+    {
         $marketId = $market?->id;
 
         return CustomForm::query()
-            ->where('slug', $slug)
             ->where('is_active', true)
             ->when($marketId !== null, function ($query) use ($marketId): void {
                 $query->where(function ($nested) use ($marketId): void {
@@ -114,7 +129,6 @@ class FormDomainService
                         ->orWhereDoesntHave('markets');
                 });
             })
-            ->with(['translations', 'markets', 'fields.translations'])
-            ->first();
+            ->with(['translations', 'markets', 'fields.translations']);
     }
 }

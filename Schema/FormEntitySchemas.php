@@ -6,6 +6,7 @@ namespace DbCms\Modules\Forms\Schema;
 
 use DbCms\Core\Content\EntitySchema;
 use DbCms\Modules\Forms\Models\CustomForm;
+use DbCms\Modules\Forms\Services\FormEditorialPreview;
 use DbCms\Modules\Forms\Services\FormMutationHandler;
 
 /**
@@ -31,6 +32,7 @@ final class FormEntitySchemas
             permission: 'manage:forms',
             createView: 'forms::admin.create',
             editView: 'forms::admin.edit',
+            previewHandler: FormEditorialPreview::class,
             mutationHandler: FormMutationHandler::class,
             fields: [
                 EntitySchema::ROLE_TITLE => ['input' => 'translations[{locale}][name]', 'label' => 'Nombre', 'required' => true],
