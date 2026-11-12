@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [1.0.1] - 2026-11-12
+
+### Corregido
+
+- Las traducciones de formularios y campos respetan el idioma y mercado solicitados mediante el lector público compartido.
+- La dependencia mínima de core pasa a `^1.1` por las APIs compartidas que utiliza este paquete.
+
 ## [1.0.0] - 2026-11-05
 
 ### Añadido
