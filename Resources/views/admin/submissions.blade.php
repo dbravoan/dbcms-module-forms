@@ -35,10 +35,13 @@
                     {{ $s->form->name ?? 'Formulario #' . $s->custom_form_id }}
                 </td>
                 <td class="py-3.5 px-4 text-[color:var(--admin-text)] max-w-sm truncate">
-                    @php
-                        $summary = collect($s->payload)->map(fn ($v, $k) => "$k: $v")->implode(' | ');
-                    @endphp
-                    {{ $summary ?: 'Sin campos' }}
+                    {{ $s->payload_summary ?: 'Sin campos' }}
+                    @foreach($s->attachments as $attachment)
+                        <a class="block underline" href="{{ route('admin.forms.attachments.show', $attachment) }}">{{ $attachment->filename }}</a>
+                    @endforeach
+                    @foreach($s->actions as $action)
+                        <span class="block">{{ $action->action_key }}: {{ $action->status }} ({{ $action->attempts }}/3)</span>
+                    @endforeach
                 </td>
                 <td class="py-3.5 px-4 text-[color:var(--admin-muted)]">{{ $s->ip_address ?? '—' }}</td>
                 <td class="py-3.5 px-4 text-[color:var(--admin-muted)]">{{ $s->created_at->format('Y-m-d H:i') }}</td>

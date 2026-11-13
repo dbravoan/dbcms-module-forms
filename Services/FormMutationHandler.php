@@ -27,7 +27,7 @@ final class FormMutationHandler implements EntityMutationHandlerInterface, Entit
     public function prepare(Model $entity, array $args, bool $creating): array
     {
         assert($entity instanceof CustomForm);
-        $attributes = (array) ($args['attributes'] ?? []);
+        $attributes = app(FormDefinitionService::class)->decode((array) ($args['attributes'] ?? []));
         $input = $attributes + array_intersect_key($args, array_flip(['translations', 'market_ids', 'fields']));
         $rules = $this->formValidationRules($creating ? null : $entity);
         $rules['translations'] = $creating ? 'required|array' : 'sometimes|array';
@@ -59,6 +59,7 @@ final class FormMutationHandler implements EntityMutationHandlerInterface, Entit
             }
             $args['fields'] = $fields;
         }
+        app(FormDefinitionService::class)->validate($input, isset($keys) ? $keys : array_values(array_map('strval', $entity->fields()->pluck('field_key')->all())), $creating ? null : $entity);
         unset($attributes['fields']);
         if ($creating) {
             $attributes += ['is_active' => false];

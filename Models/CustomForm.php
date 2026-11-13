@@ -20,6 +20,8 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $slug
  * @property string|null $notification_email
+ * @property array<string,mixed>|null $layout
+ * @property list<array<string,mixed>>|null $actions
  * @property bool $is_active
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -40,13 +42,40 @@ class CustomForm extends Model implements TranslatableEntity
         'slug',
         'notification_email',
         'is_active',
+        'layout',
+        'actions',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'layout' => 'array',
+            'actions' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(static function (self $form): void {
+            $form->submissions()->each(static fn (FormSubmission $submission) => $submission->delete());
+        });
+    }
+
+    /** Load omitted definition columns without replacing supplied or dirty values. */
+    public function loadDefinitionAttributes(): static
+    {
+        $missing = array_values(array_diff(['layout', 'actions', 'notification_email'], array_keys($this->getAttributes())));
+        if (! $this->exists || $missing === []) {
+            return $this;
+        }
+        $stored = $this->newQuery()->whereKey($this->getKey())->firstOrFail($missing);
+        foreach ($missing as $attribute) {
+            $this->setAttribute($attribute, $stored->getAttribute($attribute));
+            $this->syncOriginalAttribute($attribute);
+        }
+
+        return $this;
     }
 
     /**

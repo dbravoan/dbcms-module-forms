@@ -7,6 +7,7 @@ namespace DbCms\Modules\Forms\DTOs;
 use DbCms\Core\Models\Language;
 use DbCms\Core\Models\Market;
 use DbCms\Modules\Forms\Models\CustomForm;
+use DbCms\Modules\Forms\Services\FormWebhookPolicy;
 use Illuminate\Database\Eloquent\Collection;
 
 final readonly class FormEditorData
@@ -32,6 +33,12 @@ final readonly class FormEditorData
     /** @return array<string, mixed> */
     public function viewData(): array
     {
-        return get_object_vars($this);
+        $this->form->loadDefinitionAttributes();
+
+        return get_object_vars($this) + [
+            'composition' => $this->form->layout,
+            'formActions' => $this->form->actions ?? [],
+            'webhookTargets' => app(FormWebhookPolicy::class)->targets(),
+        ];
     }
 }

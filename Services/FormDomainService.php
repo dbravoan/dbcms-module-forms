@@ -7,12 +7,16 @@ namespace DbCms\Modules\Forms\Services;
 use DbCms\Core\Forms\FieldTypeRegistry;
 use DbCms\Core\Forms\SchemaFactory;
 use DbCms\Core\Models\Market;
+use DbCms\Core\Modules\ModuleManager;
 use DbCms\Core\Services\Content\PublicTranslation;
 use DbCms\Core\Services\Privacy\LegalPageService;
 use DbCms\Modules\Forms\Models\CustomForm;
 use DbCms\Modules\Forms\Models\FormSubmission;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -31,6 +35,17 @@ class FormDomainService
     public function submitForm(CustomForm $form, array $rawInput, ?Market $market = null, ?string $locale = null): FormSubmission
     {
         app(LegalPageService::class)->requireProcessing('forms');
+        $form->loadDefinitionAttributes();
+        if (! $form->is_active || ! app(ModuleManager::class)->isModuleEnabled('forms')
+            || ($market === null && $form->markets()->exists())
+            || ($market !== null && (! $market->is_active || ($locale !== null && ! $market->languages()->where('code', $locale)->where('is_active', true)->exists())))
+            || ($market !== null && $form->markets()->exists() && ! $form->markets()->whereKey($market->id)->exists())) {
+            throw ValidationException::withMessages(['form' => 'Formulario no disponible.']);
+        }
+
+        if ($locale !== null && $form->translation($locale, $market?->id) === null) {
+            throw ValidationException::withMessages(['form' => 'Formulario no disponible en este idioma.']);
+        }
 
         // 1. Anti-spam honeypot verification
         if (! empty($rawInput['_hp_check'] ?? '')) {
@@ -86,19 +101,49 @@ class FormDomainService
             unset($validatedData[$input]);
         }
 
-        // 3. Store submission
-        /** @var FormSubmission $submission */
-        $submission = FormSubmission::create([
-            'custom_form_id' => $form->id,
-            'payload' => $validatedData,
-            'locale' => $locale ?? app()->getLocale(),
-            'market_id' => $market?->id,
-            'ip_address' => config('privacy.forms.collect_network_metadata', false) ? request()->ip() : null,
-            'user_agent' => config('privacy.forms.collect_network_metadata', false) ? request()->userAgent() : null,
-            'is_reviewed' => false,
-        ]);
+        $paths = [];
+        try {
+            return DB::transaction(function () use ($form, $validatedData, $market, $locale, &$paths): FormSubmission {
+                $uploads = [];
+                foreach ($validatedData as $key => $value) {
+                    if ($value instanceof UploadedFile) {
+                        $uploads[$key] = $value;
+                        unset($validatedData[$key]);
+                    }
+                }
+                $submission = FormSubmission::create([
+                    'custom_form_id' => $form->id,
+                    'payload' => $validatedData,
+                    'locale' => $locale ?? app()->getLocale(),
+                    'market_id' => $market?->id,
+                    'ip_address' => config('privacy.forms.collect_network_metadata', false) ? request()->ip() : null,
+                    'user_agent' => config('privacy.forms.collect_network_metadata', false) ? request()->userAgent() : null,
+                    'is_reviewed' => false,
+                ]);
+                foreach ($uploads as $key => $upload) {
+                    $path = $upload->store('forms/'.$submission->id, 'local');
+                    if (! is_string($path)) {
+                        throw new \RuntimeException('Could not store the private form attachment.');
+                    }
+                    $paths[] = $path;
+                    $attachment = $submission->attachments()->create([
+                        'field_key' => $key, 'path' => $path,
+                        'filename' => mb_substr(preg_replace('/[\x00-\x1f\x7f]/', '_', basename(str_replace('\\', '/', $upload->getClientOriginalName()))) ?? 'attachment', 0, 255),
+                        'mime_type' => $upload->getMimeType() ?? 'application/octet-stream',
+                        'size' => $upload->getSize(),
+                    ]);
+                    // Payload carries only an owned reference; no storage path or public URL.
+                    $validatedData[$key] = ['attachment_id' => $attachment->id, 'filename' => $attachment->filename];
+                }
+                $submission->update(['payload' => $validatedData]);
+                app(FormActionService::class)->record($form, $submission, $form->actions ?? []);
 
-        return $submission;
+                return $submission;
+            });
+        } catch (\Throwable $error) {
+            Storage::disk('local')->delete($paths);
+            throw $error;
+        }
     }
 
     /**
@@ -112,8 +157,20 @@ class FormDomainService
     /** @return Collection<int, CustomForm> */
     public function getPublicForms(Market $market, string $locale): Collection
     {
-        return $this->publicQuery($market)->orderBy('id')->get()
-            ->filter(static fn (CustomForm $form): bool => PublicTranslation::resolve($form, $locale, $market) !== null)->values();
+        return $this->publicFormsQuery($market, $locale)->orderBy('id')->get();
+    }
+
+    /** @return Builder<CustomForm> */
+    public function publicFormsQuery(Market $market, string $locale): Builder
+    {
+        $query = $this->publicQuery($market);
+        if (! app(ModuleManager::class)->isModuleEnabled('forms') || ! $market->is_active
+            || ! $market->languages()->where('code', $locale)->where('is_active', true)->exists()) {
+            return $query->whereRaw('1 = 0');
+        }
+        PublicTranslation::constrainResolvedField($query, $market, $locale, 'name', 'like', '%');
+
+        return $query;
     }
 
     /** @return Builder<CustomForm> */
@@ -122,6 +179,8 @@ class FormDomainService
         $marketId = $market?->id;
 
         return CustomForm::query()
+            ->when(! app(ModuleManager::class)->isModuleEnabled('forms') || ($market !== null && ! $market->is_active), static fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($market === null, static fn ($query) => $query->whereDoesntHave('markets'))
             ->where('is_active', true)
             ->when($marketId !== null, function ($query) use ($marketId): void {
                 $query->where(function ($nested) use ($marketId): void {

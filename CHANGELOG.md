@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [1.1.0] - 2026-11-13
+
+### Añadido
+
+- Fecha, hora, URL, ocultos y adjuntos privados; diseño por pasos, grupos y columnas sin duplicar campos.
+- Acciones por envío con entrega tras commit, reintentos acotados y receptores autorizados.
+- Referencias públicas filtradas y paginadas; previsualización sin envíos.
+
+
 ## [1.0.1] - 2026-11-12
 
 ### Corregido

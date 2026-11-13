@@ -8,7 +8,7 @@
 ])
 
 @if($targetForm)
-<div class="{{ $wrapperClass }} font-mono text-xs">
+<div class="{{ $wrapperClass }} font-mono text-xs" data-cms-forms>
     @if(!empty($formTitle))
         <div class="mb-6 pb-3 border-b cms-border">
             <h3 class="text-lg font-bold cms-text flex items-center gap-2">
@@ -41,13 +41,41 @@
     @if(!$collectionReady)
         <p role="status">{{ __('legal.collection_unavailable') }}</p>
     @else
-    <form method="POST" action="{{ $url }}" class="space-y-4">
+    <form method="POST" enctype="multipart/form-data" action="{{ $url }}" class="space-y-4" data-cms-form="{{ $targetForm->slug }}" data-form-id="{{ $targetForm->id }}"
+        @if(session('form_submitted.slug') === $targetForm->slug)
+            data-form-result="{{ json_encode(['detail' => session('form_submitted'), 'actions' => session('form_actions', [])]) }}"
+        @endif>
         @csrf
 
-        <x-cms-form.fields :schema="$schema" variant="cyber" layout="grid" honeypot="_hp_check" />
+        <div data-form-status role="status" aria-live="polite" tabindex="-1"></div>
+        @if($steps === [])
+            <x-cms-form.fields :schema="$schema" variant="cyber" layout="grid" honeypot="_hp_check" />
+        @else
+            <div hidden aria-hidden="true"><input type="text" name="_hp_check" tabindex="-1" autocomplete="off"></div>
+            <p data-form-progress aria-live="polite"></p>
+            @foreach($steps as $stepIndex => $step)
+                <fieldset data-form-step="{{ $stepIndex }}" class="space-y-4">
+                    @if($step['label'] !== '')<legend class="font-bold">{{ $step['label'] }}</legend>@endif
+                    @foreach($step['groups'] as $group)
+                        <fieldset class="space-y-2">
+                            @if($group['label'] !== '')<legend>{{ $group['label'] }}</legend>@endif
+                            <div class="cms-form-columns" style="--form-mobile:{{ $group['columns']['mobile'] }};--form-tablet:{{ $group['columns']['tablet'] }};--form-desktop:{{ $group['columns']['desktop'] }}">
+                                @foreach($group['schema'] as $field)
+                                    <x-cms-form.fields :schema="[$field]" variant="cyber" layout="stack" />
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    @endforeach
+                </fieldset>
+            @endforeach
+            <div data-form-navigation hidden class="flex gap-3">
+                <button type="button" data-form-previous class="cms-btn">{{ __('Anterior') }}</button>
+                <button type="button" data-form-next class="cms-btn">{{ __('Siguiente') }}</button>
+            </div>
+        @endif
 
         <x-cms::privacy-notice owner="forms" />
-        <div class="pt-2">
+        <div class="pt-2" data-form-submit>
             <button type="submit" class="cms-btn cms-btn-primary w-full py-3">
                 {{ $btnLabel }} &rarr;
             </button>
@@ -57,3 +85,11 @@
 </div>
 
 @endif
+
+@once
+<style nonce="{{ $cspNonce ?? '' }}">
+.cms-form-columns{display:grid;grid-template-columns:repeat(var(--form-mobile,1),minmax(0,1fr));gap:1rem}
+@media(min-width:640px){.cms-form-columns{grid-template-columns:repeat(var(--form-tablet,2),minmax(0,1fr))}}
+@media(min-width:1024px){.cms-form-columns{grid-template-columns:repeat(var(--form-desktop,2),minmax(0,1fr))}}
+</style>
+@endonce

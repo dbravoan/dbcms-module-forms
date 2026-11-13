@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace DbCms\Modules\Forms\Http\Controllers;
 
-use DbCms\Core\Contracts\Services\ModuleNotificationServiceInterface;
 use DbCms\Core\Http\Controllers\Controller;
 use DbCms\Core\Models\Market;
 use DbCms\Modules\Forms\Models\CustomForm;
+use DbCms\Modules\Forms\Services\FormActionService;
+use DbCms\Modules\Forms\Services\FormDefinitionService;
 use DbCms\Modules\Forms\Services\FormDomainService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -31,29 +32,26 @@ class FormSubmitController extends Controller
         // domain service through the form field framework.
         $submission = $service->submitForm($form, $request->all(), $market, $locale);
 
-        if (app()->bound(ModuleNotificationServiceInterface::class)) {
-            /** @var ModuleNotificationServiceInterface $notifier */
-            $notifier = app(ModuleNotificationServiceInterface::class);
-            $notifier->notify(
-                module: 'forms',
-                type: 'lead',
-                title: "Nuevo Lead: {$form->name}",
-                message: "Se ha recibido un nuevo contacto a través del formulario #{$form->slug}.",
-                actionUrl: route('admin.forms.submissions', ['form_id' => $form->id]),
-                data: ['submission_id' => $submission->id, 'form_id' => $form->id, 'locale' => $locale],
-                sendEmail: true
-            );
-        }
+        $actions = app(FormActionService::class)->browserActions($submission);
 
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => $form->success_message ?? 'Thank you! Your submission has been received.',
                 'submission_id' => $submission->id,
+                'actions' => $actions,
             ]);
         }
 
+        foreach ($actions as $action) {
+            if ($action['type'] === 'redirect' && app(FormDefinitionService::class)->internalPath($action['target'] ?? '')) {
+                return redirect($action['target'] ?? '/');
+            }
+        }
+
         return back()
+            ->with('form_actions', $actions)
+            ->with('form_submitted', ['id' => $form->id, 'slug' => $form->slug, 'submission_id' => $submission->id])
             ->with('form_success', $form->success_message ?? 'Thank you! Your submission has been received.')
             ->with('success', $form->success_message ?? 'Thank you! Your submission has been received.');
     }

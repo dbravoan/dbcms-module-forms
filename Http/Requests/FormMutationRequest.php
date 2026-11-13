@@ -6,6 +6,7 @@ namespace DbCms\Modules\Forms\Http\Requests;
 
 use DbCms\Modules\Forms\Http\Controllers\Admin\Concerns\ValidatesFormPayload;
 use DbCms\Modules\Forms\Models\CustomForm;
+use DbCms\Modules\Forms\Services\FormDefinitionService;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class FormMutationRequest extends FormRequest
@@ -27,6 +28,7 @@ final class FormMutationRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->merge(app(FormDefinitionService::class)->decode($this->all()));
         $this->merge(['is_active' => $this->boolean('is_active', $this->isMethod('POST'))]);
     }
 }

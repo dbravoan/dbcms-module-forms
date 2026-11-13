@@ -163,6 +163,8 @@
         @include('forms::admin._builder', ['fields' => old('fields', $fields ?? []), 'languages' => $langs])
     </x-admin.form-card>
 
+    @include('forms::admin._composition')
+
     @if($isEdit)
         <div class="flex items-center justify-between pt-4 border-t border-[color:var(--admin-border)]">
             <button type="button"

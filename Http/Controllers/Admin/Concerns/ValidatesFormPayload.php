@@ -34,6 +34,8 @@ trait ValidatesFormPayload
             'translations.*.success_message' => 'nullable|string|max:500',
             'slug' => ['nullable', 'string', 'max:255', $slugRule],
             'notification_email' => 'nullable|email',
+            'layout' => 'nullable|array',
+            'actions' => 'nullable|array',
             'is_active' => 'nullable|boolean',
             'market_ids' => 'nullable|array',
             'market_ids.*' => 'integer|exists:markets,id',

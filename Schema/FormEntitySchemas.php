@@ -40,6 +40,8 @@ final class FormEntitySchemas
                 EntitySchema::ROLE_BODY => ['input' => 'translations[{locale}][description]', 'label' => 'Descripción', 'multiline' => true],
                 'submit_button_text' => ['input' => 'translations[{locale}][submit_button_text]', 'label' => 'Texto del botón de envío'],
                 'success_message' => ['input' => 'translations[{locale}][success_message]', 'label' => 'Mensaje de éxito', 'multiline' => true],
+                'layout' => ['input' => 'layout', 'label' => 'Pasos y grupos (referencias field_key, labels por idioma, columns mobile/tablet/desktop)', 'multiline' => true],
+                'actions' => ['input' => 'actions', 'label' => 'Acciones tras envío: id, type confirm/redirect/email/webhook/open_popup/close_popup y target', 'multiline' => true],
                 'fields' => ['input' => 'fields', 'label' => 'Campos estructurados', 'multiline' => true],
             ],
         );

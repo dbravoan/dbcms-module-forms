@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace DbCms\Modules\Forms\Blocks;
 
 use DbCms\Core\Blocks\AbstractBlockType;
-use DbCms\Core\Blocks\Contracts\ContextualBlockReferencesInterface;
+use DbCms\Core\Blocks\Contracts\SearchableBlockReferencesInterface;
 use DbCms\Core\Blocks\Contracts\TranslatableBlockInterface;
 use DbCms\Core\Models\Market;
 use DbCms\Core\Services\Content\PublicTranslation;
 use DbCms\Modules\Forms\Models\CustomForm;
 use DbCms\Modules\Forms\Models\FormField;
 use DbCms\Modules\Forms\Services\FormDomainService;
+use Illuminate\Validation\ValidationException;
 
-class CustomFormBlock extends AbstractBlockType implements ContextualBlockReferencesInterface, TranslatableBlockInterface
+class CustomFormBlock extends AbstractBlockType implements SearchableBlockReferencesInterface, TranslatableBlockInterface
 {
     public function getType(): string
     {
@@ -63,6 +64,39 @@ class CustomFormBlock extends AbstractBlockType implements ContextualBlockRefere
 
             return ['id' => $form->id, 'name' => (string) $translation?->getAttribute('name'), 'slug' => $form->slug];
         })->all())];
+    }
+
+    /** @return array{items:list<array<string,mixed>>,has_more:bool} */
+    public function searchReferences(Market $market, string $locale, string $source, string $search, int $limit, int $offset): array
+    {
+        $this->assertReference($source, 'slug');
+        $query = app(FormDomainService::class)->publicFormsQuery($market, $locale);
+        if (trim($search) !== '') {
+            PublicTranslation::constrainResolvedField($query, $market, $locale, 'name', 'like', '%'.trim($search).'%');
+        }
+        $limit = max(1, min(50, $limit));
+        $records = $query->orderBy('id')->offset(max(0, $offset))->limit($limit + 1)->get();
+        $items = [];
+        foreach ($records->take($limit) as $form) {
+            $translation = PublicTranslation::resolve($form, $locale, $market);
+            $items[] = ['id' => $form->id, 'name' => (string) $translation?->getAttribute('name'), 'slug' => $form->slug];
+        }
+
+        return ['items' => $items, 'has_more' => $records->count() > $limit];
+    }
+
+    public function referenceExists(Market $market, string $locale, string $source, string $key, string|int $value): bool
+    {
+        $this->assertReference($source, $key);
+
+        return app(FormDomainService::class)->publicFormsQuery($market, $locale)->where('slug', $value)->exists();
+    }
+
+    private function assertReference(string $source, string $key): void
+    {
+        if ($source !== 'forms' || $key !== 'slug') {
+            throw ValidationException::withMessages(['references' => 'Origen o campo de referencias no admitido.']);
+        }
     }
 
     public function getEditorSchema(): array

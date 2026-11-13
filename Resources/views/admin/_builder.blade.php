@@ -176,6 +176,7 @@ function formFieldsBuilder(initialFields, initialLanguages, initialLocale, initi
 
         init() {
             this.items = (initialFields || []).map((item) => this.ensureField(item));
+            this.$watch('items', () => window.dispatchEvent(new CustomEvent('cms-form-fields-changed', {detail:this.items.map(item => item.field_key)})));
 
             window.addEventListener('cms-locale-switched', (event) => {
                 const code = event.detail && event.detail.locale;

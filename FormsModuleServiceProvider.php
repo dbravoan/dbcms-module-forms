@@ -12,12 +12,14 @@ use DbCms\Core\Models\User;
 use DbCms\Core\Modules\BaseModuleServiceProvider;
 use DbCms\Modules\Forms\Blocks\CustomFormBlock;
 use DbCms\Modules\Forms\Capabilities\FormResources;
+use DbCms\Modules\Forms\Console\DeliverFormsCommand;
 use DbCms\Modules\Forms\Console\FormPrivacyCommand;
 use DbCms\Modules\Forms\Contracts\FormAdministrationServiceInterface;
 use DbCms\Modules\Forms\Contracts\FormEditorServiceInterface;
 use DbCms\Modules\Forms\Http\Controllers\FormSubmitController;
 use DbCms\Modules\Forms\Schema\FormEntitySchemas;
 use DbCms\Modules\Forms\Services\FormAdministrationService;
+use DbCms\Modules\Forms\Services\FormCookieDisclosure;
 use DbCms\Modules\Forms\Services\FormEditorService;
 use DbCms\Modules\Forms\Services\FormPresentationService;
 use DbCms\Modules\Forms\Services\FormsDashboard;
@@ -38,6 +40,9 @@ class FormsModuleServiceProvider extends BaseModuleServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/Config/entity_search.php', 'entity_search.sources');
+        $this->mergeConfigFrom(__DIR__.'/Config/delivery.php', 'forms_delivery');
+        $this->app->singleton(FormCookieDisclosure::class);
+        $this->app->tag(FormCookieDisclosure::class, 'cms.cookie-disclosures');
         $this->app->bind(FormAdministrationServiceInterface::class, FormAdministrationService::class);
         $this->app->bind(FormEditorServiceInterface::class, FormEditorService::class);
     }
@@ -45,10 +50,11 @@ class FormsModuleServiceProvider extends BaseModuleServiceProvider
     public function boot(): void
     {
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
+            $schedule->command('forms:deliver')->everyMinute()->withoutOverlapping()->when(static fn (): bool => Schema::hasTable('form_submission_actions'));
             $schedule->command('forms:privacy prune')->daily()->withoutOverlapping()->when(static fn (): bool => Schema::hasTable('form_submissions'));
         });
         if ($this->app->runningInConsole()) {
-            $this->commands([FormPrivacyCommand::class]);
+            $this->commands([FormPrivacyCommand::class, DeliverFormsCommand::class]);
         }
         $this->app->make(CapabilityResourceRegistry::class)->register(FormResources::descriptor());
         parent::boot();

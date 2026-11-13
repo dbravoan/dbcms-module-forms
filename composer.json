@@ -4,7 +4,7 @@
     "description": "Dynamic custom form builder with runtime validation, honeypot anti-spam, and localized submission intake",
     "license": "MIT",
     "require": {
-        "dbravoan/dbcms-core": "^1.1"
+        "dbravoan/dbcms-core": "^1.2"
     },
     "autoload": {
         "psr-4": {
